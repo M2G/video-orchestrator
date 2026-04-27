@@ -1,0 +1,9 @@
+vendor/
+bin/
+.idea
+pgdata
+redis-data
+cmd/video-orchestrator/var/www/html/streams/*
+cmd/video-orchestrator/tmp/videos/*
+*.DS_Store
+*.log
