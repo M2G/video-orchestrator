@@ -1,0 +1,14 @@
+version: "2"
+servers:
+  - engine: postgresql
+    uri: "postgresql://admin:admin@127.0.0.1:5432/postgres"
+sql:
+  - engine: "postgresql"
+    queries: "./internal/infrastructure/persistence/sqlc/queries.sql"
+    schema: "./internal/infrastructure/persistence/sqlc/schema.sql"
+    database:
+      managed: true
+    gen:
+      go:
+        out: "db"
+        sql_package: "pgx/v5"
