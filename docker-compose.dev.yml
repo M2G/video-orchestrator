@@ -1,0 +1,67 @@
+version: '3.7'
+
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    container_name: video_orchestrator
+    volumes:
+      - ./:/go/src/github.com/video-orchestrator
+    environment:
+    #- GOOGLE_APPLICATION_CREDENTIALS=credentials.json
+    - VIRTUAL_PORT=80
+    #- VIRTUAL_HOST=video-orchestrator.docker.dev
+    env_file:
+      - configuration/env/dev.env
+    ports:
+      - 8181:8181
+    depends_on:
+      - postgres
+      - redis
+  redis:
+    image: redis:alpine
+    container_name: cache
+    ports:
+      - ${HOST_PORT_REDIS}:${CONTAINER_PORT_REDIS}
+    volumes:
+      - ./redis-data:/data
+  postgres:
+    image: postgres:18-alpine3.22
+    restart: always
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - ${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}
+    logging:
+      options:
+        max-size: 10m
+        max-file: '10' # good
+    volumes:
+      # chmod +x ./postgres-initdb.sh
+      # chmod +x ./sql
+      # any problem exec : docker-compose down --volumes; docker volume prune
+      #- postgres-data2:/var/lib/postgresql/_data
+      - ./pgdata:/var/lib/postgresql
+      - ./postgres-initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+      # copy the sql script to fill tables
+      #- ./sql/fill_tables.sql:/docker-entrypoint-initdb.d/fill_tables.sql
+      #- ${POSTGRES_DATA}:/var/lib/postgresql/data
+    healthcheck:
+      #CHANGE 1: this command checks if the database is ready, right on the source db server
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  postgres_network:
+    driver: bridge

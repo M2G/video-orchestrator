@@ -1,0 +1,11 @@
+#CredentialsFile: credentials.json
+#ProjectID: project-id
+
+AppName: video-orchestrator
+
+Logging:
+  Level: debug
+
+Server:
+  Port: 80
+  Host: 0.0.0.0

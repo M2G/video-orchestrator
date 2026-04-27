@@ -1,0 +1,14 @@
+version: '3.5'
+services:
+  api_test:
+    container_name: api_test
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+      args:
+        SSH_PRIVATE_KEY: $SSH_PRIVATE_KEY
+    environment:
+      - GO111MODULE=off
+    working_dir: /go/src/github.com/video-orchestrator
+    command: "go test -v -timeout 10m -tags=integration -parallel=4 ./..."

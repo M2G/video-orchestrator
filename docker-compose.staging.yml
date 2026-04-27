@@ -1,0 +1,15 @@
+version: '3.5'
+
+services:
+  api:
+    image: $CONTAINER_STAGING_IMAGE
+    environment:
+    - API_ENV=staging
+    - VIRTUAL_PORT=80
+    - VIRTUAL_HOST=video-orchestrator-stg.api.com
+    command: --configuration /conf-staging.yml
+
+networks:
+  default:
+    external:
+      name: staging
