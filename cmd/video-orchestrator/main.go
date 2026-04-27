@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	_ "fmt"
 	"log"
@@ -11,8 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"video-orchestrator/db"
 	"video-orchestrator/internal/application"
+	"video-orchestrator/internal/infrastructure/db"
 	"video-orchestrator/internal/infrastructure/repository"
 	"video-orchestrator/internal/infrastructure/storage"
 	"video-orchestrator/internal/interfaces"
@@ -22,45 +21,46 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func handleShutdown(cancel context.CancelFunc) {
+
+	sigChan := make(chan os.Signal, 1)
+
+	signal.Notify(sigChan,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+	)
+
+	<-sigChan
+
+	log.Println("shutdown signal received")
+	cancel()
+}
+
 func Run(context.Context, *cli.Command) error {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go handleShutdown(cancel)
 
 	dsn := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%s/%s?sslmode=disable",
 		"admin", "admin", "postgres", "5432", "postgres",
 	)
 
-	// DB
-	conn, err := sql.Open("postgres", dsn)
-	if err != nil {
-		log.Fatal("db open:", err)
-	}
-	defer conn.Close()
+	pool := db.NewPool(dsn)
+	defer pool.Close()
 
-	conn.SetMaxOpenConns(10)
-	conn.SetMaxIdleConns(5)
-	conn.SetConnMaxLifetime(time.Hour)
-
-	queries := db.New(conn)
-
-	repo := repository.New(queries)
-
-	handler := interfaces.DefaultHandler{}
-
-	orchestrator := application.NewOrchestrator(repo, handler, 5)
-
-	scheduler := interfaces.NewScheduler(
-		orchestrator,
-		1*time.Second, // interval
-		10,            // batch size
-	)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	repo := repository.New(pool)
 
 	storage.StartFakeS3()
 
 	s3 := storage.NewFakeS3("videos")
 	s3.CreateBucket(ctx)
+
+	handler := interfaces.NewVideoHandler()
+
+	orchestrator := application.NewOrchestrator(repo, handler, 5)
 
 	watcher := interfaces.NewWatcher(
 		"cmd/video-orchestrator/tmp/videos/done",
@@ -71,23 +71,21 @@ func Run(context.Context, *cli.Command) error {
 
 	go watcher.Start(ctx)
 
-	go scheduler.Start(ctx)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	log.Println("application started")
 
-	log.Println("orchestrator started")
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("shutting down")
+			return nil
 
-	<-sig
-
-	log.Println("shutdown signal received")
-	cancel()
-
-	time.Sleep(2 * time.Second)
-
-	log.Println("shutdown complete")
-
-	return nil
+		case <-ticker.C:
+			orchestrator.RunOnce(ctx, 10)
+		}
+	}
 }
 
 func main() {
