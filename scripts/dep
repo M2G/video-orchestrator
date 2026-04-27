@@ -1,0 +1,15 @@
+eval `ssh-agent -s`
+
+if [ ! -z "$SSH_PRIVATE_KEY" ]
+then
+      apk -u add bash
+      export GO111MODULE=on
+      bash -c "ssh-add <(echo '$SSH_PRIVATE_KEY')"
+      mkdir -p ~/.ssh
+      echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+      git config --global url."git@gitlab.com:".insteadOf "https://gitlab.com/"
+
+      go mod vendor
+      go mod download
+fi
+
