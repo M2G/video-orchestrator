@@ -16,9 +16,9 @@ import (
 	"video-orchestrator/internal/infrastructure/storage"
 	"video-orchestrator/internal/interfaces"
 
-	"github.com/urfave/cli/v3"
+	logrus "video-orchestrator/internal/infrastructure/logger"
 
-	_ "github.com/lib/pq"
+	"github.com/urfave/cli/v3"
 )
 
 func handleShutdown(cancel context.CancelFunc) {
@@ -37,6 +37,8 @@ func handleShutdown(cancel context.CancelFunc) {
 }
 
 func Run(context.Context, *cli.Command) error {
+
+	log := logrus.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -60,13 +62,14 @@ func Run(context.Context, *cli.Command) error {
 
 	handler := interfaces.NewVideoHandler()
 
-	orchestrator := application.NewOrchestrator(repo, handler, 5)
+	orchestrator := application.NewOrchestrator(repo, handler, 5, log)
 
 	watcher := interfaces.NewWatcher(
 		"cmd/video-orchestrator/tmp/videos/done",
 		"cmd/video-orchestrator/var/www/html/streams/video",
 		s3,
 		repo,
+		log,
 	)
 
 	go watcher.Start(ctx)
@@ -74,12 +77,12 @@ func Run(context.Context, *cli.Command) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	log.Println("application started")
+	log.Info("application started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("shutting down")
+			log.Info("shutting down")
 			return nil
 
 		case <-ticker.C:

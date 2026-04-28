@@ -11,6 +11,7 @@ require (
 	github.com/johannesboyne/gofakes3 v0.0.0-20260208201424-4c385a1f6a73
 	github.com/lib/pq v1.12.3
 	github.com/redis/go-redis/v9 v9.18.0
+	github.com/sirupsen/logrus v1.9.4
 	github.com/urfave/cli/v3 v3.8.0
 )
 

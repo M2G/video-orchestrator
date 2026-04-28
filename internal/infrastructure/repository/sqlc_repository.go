@@ -20,7 +20,6 @@ func New(pool *pgxpool.Pool) *SQLCRepository {
 }
 
 func (r *SQLCRepository) LockAndMarkProcessing(ctx context.Context, limit int32) ([]domain.VideoJob, error) {
-
 	rows, err := r.q.LockAndMarkProcessing(ctx, int64(limit))
 	if err != nil {
 		return nil, err

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"video-orchestrator/internal/domain"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Repository interface {
@@ -26,14 +28,16 @@ type Orchestrator struct {
 
 	workers int
 	breaker *CircuitBreaker
+	log     *logrus.Logger
 }
 
-func NewOrchestrator(repo Repository, handler Handler, workers int) *Orchestrator {
+func NewOrchestrator(repo Repository, handler Handler, workers int, log *logrus.Logger) *Orchestrator {
 	return &Orchestrator{
 		repo:    repo,
 		handler: handler,
 		workers: workers,
 		breaker: NewCircuitBreaker(5, 10*time.Second),
+		log:     log,
 	}
 }
 
@@ -50,7 +54,15 @@ func (o *Orchestrator) handleFailure(ctx context.Context, job domain.VideoJob) {
 
 	delay := domain.NextDelay(job.RetryCount)
 
+	o.log.WithFields(logrus.Fields{
+		"job_id": job.ID,
+		"retry":  job.RetryCount,
+		"delay":  delay,
+	}).Warn("job_retry")
+
 	if err := o.repo.MarkRetry(ctx, job.ID, delay); err != nil {
+		o.log.WithField("job_id", job.ID).
+			Error("job_failed_permanently")
 		log.Println("failed to mark retry:", err)
 	}
 }
@@ -58,6 +70,7 @@ func (o *Orchestrator) handleFailure(ctx context.Context, job domain.VideoJob) {
 func (o *Orchestrator) RunOnce(ctx context.Context, limit int32) {
 
 	jobs, err := o.repo.LockAndMarkProcessing(ctx, limit)
+	o.log.WithField("jobs_count", len(jobs)).Info("jobs_locked")
 	if err != nil {
 		log.Println(`{"event":"lock_failed"}`)
 		return
@@ -67,11 +80,11 @@ func (o *Orchestrator) RunOnce(ctx context.Context, limit int32) {
 	sem := make(chan struct{}, o.workers) // worker pool
 
 	for _, job := range jobs {
-
 		sem <- struct{}{}
 		wg.Add(1)
 
 		go func(j domain.VideoJob) {
+			o.log.WithField("job_id", j.ID).Info("job_started")
 			defer wg.Done()
 			defer func() { <-sem }()
 
@@ -79,6 +92,7 @@ func (o *Orchestrator) RunOnce(ctx context.Context, limit int32) {
 
 			// circuit breaker
 			if !o.breaker.Allow() {
+				o.log.Warn("circuit_breaker_open")
 				log.Println(`{"event":"breaker_open"}`)
 				return
 			}
@@ -86,6 +100,9 @@ func (o *Orchestrator) RunOnce(ctx context.Context, limit int32) {
 			err := o.handler.Handle(ctx, j)
 
 			if err != nil {
+				o.log.WithError(err).
+					WithField("job_id", j.ID).
+					Error("job_failed")
 				o.breaker.Fail()
 				o.handleFailure(ctx, j)
 				return
@@ -97,6 +114,9 @@ func (o *Orchestrator) RunOnce(ctx context.Context, limit int32) {
 				log.Println("mark_done_error:", err)
 			}
 
+			o.log.WithFields(logrus.Fields{
+				"job_id": j.ID,
+			}).Info("job_done")
 			log.Printf(`{"event":"job_done","job_id":%d,"duration_ms":%d}`,
 				j.ID,
 				time.Since(start).Milliseconds(),

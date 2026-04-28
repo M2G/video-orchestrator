@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Storage interface {
@@ -24,14 +26,16 @@ type Watcher struct {
 	videoDir string
 	storage  Storage
 	repo     JobRepository
+	log      *logrus.Logger
 }
 
-func NewWatcher(doneDir, videoDir string, storage Storage, repo JobRepository) *Watcher {
+func NewWatcher(doneDir, videoDir string, storage Storage, repo JobRepository, log *logrus.Logger) *Watcher {
 	return &Watcher{
 		doneDir:  doneDir,
 		videoDir: videoDir,
 		storage:  storage,
 		repo:     repo,
+		log:      log,
 	}
 }
 
@@ -52,6 +56,8 @@ func (w *Watcher) Start(ctx context.Context) {
 
 			for _, f := range files {
 
+				w.log.WithField("file", f).Info("file_detected")
+
 				if seen[f] {
 					continue
 				}
@@ -71,12 +77,16 @@ func (w *Watcher) Handle(ctx context.Context, mp4Path string) {
 
 	id, err := strconv.ParseInt(videoID, 10, 64)
 	if err != nil {
+		w.log.WithField("file", mp4Path).
+			Error("invalid_video_id")
 		log.Println("invalid video ID:", videoID)
 		return
 	}
 
 	exists, err := w.repo.Exists(ctx, id)
 	if err != nil || !exists {
+		w.log.WithField("job_id", id).
+			Warn("job_not_found")
 		log.Println("job not found:", id)
 		return
 	}
@@ -84,6 +94,11 @@ func (w *Watcher) Handle(ctx context.Context, mp4Path string) {
 	files, _ := filepath.Glob(filepath.Join(w.videoDir, "*"))
 
 	for _, f := range files {
+
+		w.log.WithFields(logrus.Fields{
+			"file":     f,
+			"video_id": videoID,
+		}).Info("uploading_file")
 
 		ext := filepath.Ext(f)
 		if ext != ".ts" && ext != ".m3u8" && ext != ".txt" {
@@ -94,6 +109,9 @@ func (w *Watcher) Handle(ctx context.Context, mp4Path string) {
 
 		err := w.storage.Upload(ctx, f, key)
 		if err != nil {
+			w.log.WithError(err).
+				WithField("file", f).
+				Error("upload_failed")
 			log.Println("upload error:", err)
 			return
 		}
@@ -113,5 +131,7 @@ func (w *Watcher) Handle(ctx context.Context, mp4Path string) {
 		return
 	}
 
+	w.log.WithField("video_id", videoID).
+		Info("upload_complete")
 	log.Println("job completed:", id)
 }
