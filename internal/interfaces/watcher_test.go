@@ -8,39 +8,47 @@ import (
 )
 
 type fakeStorage struct {
-	uploaded []string
+	count int
 }
 
 func (f *fakeStorage) Upload(ctx context.Context, path, key string) error {
-	f.uploaded = append(f.uploaded, key)
+	f.count++
 	return nil
 }
 
-func TestWatcherUploadsFiles(t *testing.T) {
+type fakeRepo struct{}
 
-	tmpDir := t.TempDir()
+func (f *fakeRepo) Exists(ctx context.Context, id int64) (bool, error) {
+	return true, nil
+}
 
-	videoDir := filepath.Join(tmpDir, "video")
-	doneDir := filepath.Join(tmpDir, "done")
+func (f *fakeRepo) MarkDone(ctx context.Context, id int64) error {
+	return nil
+}
+
+func TestWatcher_Handle(t *testing.T) {
+
+	tmp := t.TempDir()
+
+	videoDir := filepath.Join(tmp, "video")
+	doneDir := filepath.Join(tmp, "done")
 
 	os.MkdirAll(videoDir, 0755)
 	os.MkdirAll(doneDir, 0755)
 
-	// fichiers HLS
-	os.WriteFile(filepath.Join(videoDir, "seg1.ts"), []byte("data"), 0644)
-	os.WriteFile(filepath.Join(videoDir, "playlist.m3u8"), []byte("data"), 0644)
+	os.WriteFile(filepath.Join(videoDir, "seg.ts"), []byte("data"), 0644)
 
-	// trigger
-	os.WriteFile(filepath.Join(doneDir, "video.mp4"), []byte("done"), 0644)
+	mp4 := filepath.Join(doneDir, "42.mp4")
+	os.WriteFile(mp4, []byte("done"), 0644)
 
 	storage := &fakeStorage{}
+	repo := &fakeRepo{}
 
-	w := NewWatcher(doneDir, videoDir, storage)
+	w := NewWatcher(doneDir, videoDir, storage, repo)
 
-	// appeler directement handle
-	w.Handle(filepath.Join(doneDir, "video.mp4"))
+	w.Handle(context.Background(), mp4)
 
-	if len(storage.uploaded) == 0 {
-		t.Fatal("expected uploads, got none")
+	if storage.count == 0 {
+		t.Fatal("expected uploads")
 	}
 }
