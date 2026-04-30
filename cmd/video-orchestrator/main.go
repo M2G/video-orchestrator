@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	_ "fmt"
 	"log"
-	_ "net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -95,7 +93,7 @@ func main() {
 	cmd := &cli.Command{
 		Name:    "boom",
 		Version: "v1.0.0",
-		Usage:   "Golang init",
+		Usage:   "Video orchestrator",
 		Action:  Run,
 	}
 

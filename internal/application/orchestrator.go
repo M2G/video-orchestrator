@@ -25,7 +25,6 @@ type Handler interface {
 type Orchestrator struct {
 	repo    Repository
 	handler Handler
-
 	workers int
 	breaker *CircuitBreaker
 	log     *logrus.Logger

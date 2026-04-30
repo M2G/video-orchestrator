@@ -17,7 +17,6 @@ func NewCircuitBreaker(threshold int, reset time.Duration) *CircuitBreaker {
 }
 
 func (c *CircuitBreaker) Allow() bool {
-
 	if c.failures < c.threshold {
 		return true
 	}
