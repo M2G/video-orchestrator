@@ -1,0 +1,20 @@
+{
+  "name": "video-orchestrator",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "node --watch --loader ts-node/esm src/main.ts",
+    "sqlc": "sqlc generate"
+  },
+  "dependencies": {
+    "postgres": "^3.4.4",
+    "@aws-sdk/client-s3": "^3.600.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2"
+  }
+}

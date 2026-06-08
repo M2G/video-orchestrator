@@ -1,0 +1,17 @@
+version: "2"
+plugins:
+  - name: ts
+    wasm:
+      url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript/v1.0.0/sqlc-gen-typescript_1.0.0.wasm
+      sha256: "bede9e38b30fc4c4f3b52f93b3671a01df2e6f7bb61868c91b1a685c1b827d4f"
+sql:
+  - engine: "postgresql"
+    queries: "sql/queries.sql"
+    schema: "sql/schema.sql"
+    gen:
+      plugin:
+        plugin: ts
+        out: "src/infrastructure/db/generated"
+        options:
+          runtime: node
+          driver: postgres.js
