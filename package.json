@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "node-gyp build && tsc && tsc-alias",
+    "build:native": "node-gyp build",
     "start": "node dist/main.js",
     "dev": "node --watch --loader ts-node/esm src/main.ts",
-    "sqlc": "sqlc generate"
+    "sqlc": "sqlc generate",
+    "test": "node --test --loader ts-node/esm src/**/*.test.ts"
   },
   "dependencies": {
     "postgres": "^3.4.4",
