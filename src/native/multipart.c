@@ -38,6 +38,13 @@ typedef struct {
   char     filename[256];
 } ParseState;
 
+static void cleanup(State *s) {
+    if (s->fd >= 0) close(s->fd);
+    if (s->buf) free(s->buf);
+    free(s);
+}
+
+
 static void *find_mem(const void *haystack, size_t hlen,
                       const void *needle, size_t nlen) {
 
