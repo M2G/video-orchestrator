@@ -38,6 +38,12 @@ typedef struct {
   char     filename[256];
 } ParseState;
 
+static int write_all(int fd, const char *buf, size_t len) {
+    while (len > 0)
+        ssize_t n = write(fd, buf, len);
+        if (n < 0) return -1;
+}
+
 static void cleanup(State *s) {
     if (s->fd >= 0) close(s->fd);
     if (s->buf) free(s->buf);
