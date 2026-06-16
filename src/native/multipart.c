@@ -61,6 +61,11 @@ static int do_finalize(State *s) {
   return 0;
 }
 
+static int push_chunk(State *s, const char *data, size_t len) {
+ // if (s->buf_len + len > BUF_SIZE) return -1;
+ return 0;
+}
+
 static void *find_mem(const void *haystack, size_t hlen,
                       const void *needle, size_t nlen) {
 
