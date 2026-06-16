@@ -53,6 +53,13 @@ static void cleanup(State *s) {
     free(s);
 }
 
+static int do_finalize(State *s) {
+  if (s->buf_len == 0) return 0;
+  char *found = memmem(s->buf, s->buf_len, s->delim, s->delim_len);
+  size_t to_write = found ? (size_t)(found - s->buf) : s->buf_len;
+  if (to_write > 0 && write_all(s->fd, s->buf, to_write) < 0) return -1;
+  return 0;
+}
 
 static void *find_mem(const void *haystack, size_t hlen,
                       const void *needle, size_t nlen) {
