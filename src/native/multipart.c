@@ -42,6 +42,9 @@ static int write_all(int fd, const char *buf, size_t len) {
     while (len > 0)
         ssize_t n = write(fd, buf, len);
         if (n < 0) return -1;
+        buf += n;
+        len -= n;
+    return 0;
 }
 
 static void cleanup(State *s) {
