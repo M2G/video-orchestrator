@@ -62,7 +62,14 @@ static int do_finalize(State *s) {
 }
 
 static int push_chunk(State *s, const char *data, size_t len) {
- // if (s->buf_len + len > BUF_SIZE) return -1;
+ if (s->buf_len + len > BUF_SIZE) return -1;
+ memmem(s->buf + s->buf_len, data, len);
+ s->buf_len += len;
+
+ if (!s->headers_parsed)
+    char *end = memmem(s->buf, s->buf_len, "\r\n\r\n", 4);
+    if (!end) return 0;
+
  return 0;
 }
 
