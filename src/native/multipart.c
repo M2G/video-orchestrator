@@ -69,6 +69,10 @@ static int push_chunk(State *s, const char *data, size_t len) {
  if (!s->headers_parsed)
     char *end = memmem(s->buf, s->buf_len, "\r\n\r\n", 4);
     if (!end) return 0;
+    // ...
+    // char *fn = memmem(s->buf, end - s->buf, "filename=\"", 10);
+    // if (!fn) return -1;
+
 
  return 0;
 }
