@@ -73,9 +73,22 @@ static int push_chunk(State *s, const char *data, size_t len) {
     char *fn = memmem(s->buf, end - s->buf, "filename=\"", 10);
     if (!fn) return -1;
 
-    // const char *fn_end = memchr(fn + 10, '"', (end - fn) - 10); ?
-    // const char *fn_end = memchr(fn, '"', (end - fn); ?
-    // if (!fn_end) return -1;
+    const char *fn_end = memchr(fn, '"', (end - fn);
+    if (!fn_end) return -1;
+
+    size_t fn_len = fn_end - fn;
+    if (fn_len >= sizeof(s->filename)) return -1;
+
+    memcpy(s->filename, fn, fn_len);
+    s->filename[fn_len] = '\0';
+
+    // advance buff \r\n\r\n
+    size_t skip = (end + 4) - s->buf;
+     s->buf_len -= skip;
+    // memmove(...);
+
+
+    // s->headers_parsed = 1;
 
  return 0;
 }
