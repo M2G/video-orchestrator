@@ -85,8 +85,7 @@ static int push_chunk(State *s, const char *data, size_t len) {
     // advance buff \r\n\r\n
     size_t skip = (end + 4) - s->buf;
      s->buf_len -= skip;
-    // memmove(...);
-
+     memmove(s->buf, s->buf + skip, s->buf_len);
 
     // s->headers_parsed = 1;
 
