@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "node-gyp build && tsc && tsc-alias",
-    "build:native": "node-gyp build",
+    "build": "tsc && tsc-alias",
     "start": "node dist/main.js",
     "dev": "node --watch --loader ts-node/esm src/main.ts",
     "sqlc": "sqlc generate",
