@@ -1,51 +1,36 @@
-#
-# Docker NodeJS TypeScript Production-Ready Configuration
-#
-ARG NODE_VERSION=24.2.0
-ARG ALPINE_VERSION=3.21
+FROM golang:1.26-alpine3.22 AS base
 
-# Build stage - Compile TypeScript and install dependencies
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS build
+ENV CGO_ENABLED=0
+ENV GOTOOLCHAIN=auto
 
-# Install security updates and build dependencies
-RUN apk update && apk upgrade && \
-    apk add --no-cache --virtual .build-deps \
-    make \
-    gcc \
-    g++ \
-    python3 \
-    && rm -rf /var/cache/apk/*
+RUN apk add --no-cache git build-base
 
-# Set working directory to App dir
-WORKDIR /app
+WORKDIR /go/src/video-orchestrator
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy package files first for better caching
-COPY package*.json ./
-COPY tsconfig.json ./
-
-# Install dependencies (including dev dependencies for build)
-RUN npm ci --only=production=false && \
-    npm cache clean --force
-
-# Copy source code
 COPY . .
 
-# Create environment file if it doesn't exist
-RUN [ -f .env ] || cp .env.example .env || echo "# Environment variables" > .env
+FROM base AS dev
 
-# Install dependencies
-RUN npm install
+RUN go install github.com/M2G/modd/cmd/modd@v0.1.2
+RUN mv "$(go env GOPATH)/bin/modd" /usr/local/bin/modd
 
-FROM node:24.2.0-alpine3.21 as app
+EXPOSE 8181
+ENTRYPOINT ["modd"]
+CMD ["-f", "configuration/modd/modd.conf"]
 
-## Copy built node modules and binaries without including the toolchain
-COPY --from=build /app .
 
-WORKDIR /app
+FROM base AS builder
 
-CMD [ "/app/scripts/run.sh" ]
+RUN make build
 
-# Remove dev dependencies and clean up
-RUN #npm prune --production && \
-    npm cache clean --force && \
-    apk del .build-deps
+
+FROM alpine:latest AS release
+
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /go/src/video-orchestrator/bin/video-orchestrator /video-orchestrator
+
+EXPOSE 8181
+ENTRYPOINT ["/video-orchestrator"]
