@@ -8,12 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	interfaces2 "video-orchestrator/src/interfaces"
-	"video-orchestrator/src/internal/infrastructure/logger"
-	"video-orchestrator/src/internal/infrastructure/repository"
+	"video-orchestrator/internal/infrastructure/logger"
+	"video-orchestrator/internal/infrastructure/repository"
+	"video-orchestrator/internal/interfaces"
 
 	"video-orchestrator/internal/infrastructure/db"
-	"video-orchestrator/internal/interfaces"
 
 	"github.com/sirupsen/logrus"
 )
