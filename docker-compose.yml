@@ -1,84 +1,48 @@
-#
-# Docker NodeJS
-# Example Docker Compose file
-#
-
-# For more information about the directives defined here:
-# https://docs.docker.com/compose/compose-file/
-
-# Docker compose file version
-version: "3.8"
-
 services:
-  app:
-    build: .
-    working_dir: /app
+  api:
+    build:
+      context: .
+      target: dev
+    container_name: video_orchestrator
+    volumes:
+      - ./:/go/src/video-orchestrator
+      - /var/www/html/streams:/var/www/html/streams
+      - /var/www/html/uploads:/var/www/html/uploads
     env_file:
+      - configuration/env/dev.env
       - .env
     ports:
-      - ${PORT}:${PORT}
-    volumes:
-      - .:/app
-      - /app/node_modules/bcrypt
-    command: npm run start:dev
+      - "8181:8181"
     depends_on:
-      - postgres
-      - redis
-  #    networks:
-  #      - common_network
-
-  redis:
-    image: redis:alpine
-    container_name: cache
-    ports:
-      - ${HOST_PORT_REDIS}:${CONTAINER_PORT_REDIS}
-    volumes:
-      - ./redis-data:/data
-  #    networks:
-  #      - common_network
+      postgres:
+        condition: service_healthy
 
   postgres:
-    image: postgres:15.2-alpine
+    image: postgres:18-alpine
+    container_name: video_db
     restart: always
     environment:
-      - POSTGRES_DB=test_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - DB_SCHEMA=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_HOST=postgres
-      - SECRET=SECRET
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     logging:
       options:
         max-size: 10m
-        max-file: '10' # good
+        max-file: "10"
     ports:
-      - ${HOST_PORT}:${CONTAINER_PORT}
+      - "${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}"
     volumes:
-      # chmod +x ./postgres-initdb.sh
-      # chmod +x ./sql
-      # any problem exec : docker-compose down --volumes; docker volume prune
-      - postgres-data2:/var/lib/postgresql/data
-      - ./postgres-initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
-      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
-      # copy the sql script to fill tables
-      - ./sql/fill_tables.sql:/docker-entrypoint-initdb.d/fill_tables.sql
+      - postgres-data:/var/lib/postgresql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     security_opt:
       - seccomp:unconfined
     cap_add:
       - SYS_NICE
     healthcheck:
-      #CHANGE 1: this command checks if the database is ready, right on the source db server
-      test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
-#    networks:
-#      - common_network
-
-#networks:
-#  common_network:
 
 volumes:
-  postgres-data2:
+  postgres-data:
