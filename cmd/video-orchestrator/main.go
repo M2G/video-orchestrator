@@ -39,7 +39,7 @@ func main() {
 	watcher := interfaces.NewWatcher(streamsDir, repo)
 	go watcher.Start(ctx, log)
 
-	httpServer := interfaces2.NewHTTPServer(repo, uploadDir, streamsDir, log)
+	httpServer := interfaces.NewHTTPServer(repo, uploadDir, streamsDir, log)
 
 	go func() {
 		<-ctx.Done()
