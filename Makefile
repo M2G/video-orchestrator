@@ -1,12 +1,59 @@
-start:
-	npm run start
+ifeq ($(CI_COMMIT_REF_NAME),)
+    branch = $(shell git rev-parse --abbrev-ref HEAD)
+else
+    branch = tag:$(CI_COMMIT_REF_NAME)
+endif
 
-build:
-	npm run build
+commit = $(shell git log --pretty=format:'%H' -n 1)
+now = $(shell date "+%Y-%m-%d %T UTC%z")
+compiler = $(shell go version)
+
+
+IMAGE_NAME :=  registry.github.com/video-orchestrator
+
+all: test build image
+.PHONY: all test clean
 
 test:
-	npm run test
+	@echo "Running tests"
+	@docker-compose -f docker-compose.test.yml up	\
+	--build											\
+	--abort-on-container-exit						\
+	--force-recreate								\
+	--quiet-pull									\
+	--no-color										\
+	--remove-orphans								\
+	--timeout 100
+	@docker-compose -f docker-compose.test.yml rm -f
 
-story:
-	npm run storybook
+build:
+	@echo "Compiling the binaries"
+	CGO_ENABLED=0									\
+	GOBIN=$(PWD)/bin								\
+	go install  -v									\
+	-ldflags										\
+	"-X 'main.branch=$(branch)'						\
+	-X 'main.sha=$(commit)'							\
+	-X 'main.compiledAt=$(now)'						\
+	-X 'main.compiler=$(compiler)'					\
+	-s -w"											\
+	-a -installsuffix cgo ./...
 
+image:
+	@echo "Building Docker Image"
+	@(docker build -t $(IMAGE_NAME) .)
+
+
+clean:
+	@rm -rf $(PWD)/bin/*
+
+re: clean build
+
+dev:
+	@echo "Running dev"
+	@docker-compose -f docker-compose.yml up	\
+		--force-recreate							\
+		--quiet-pull								\
+		--no-color									\
+		--remove-orphans
+	@docker-compose rm -f
