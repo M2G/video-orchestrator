@@ -3,4 +3,4 @@
 .idea/*
 .env
 configuration/env/*.env
-bin/*node_modules/
+bin/
