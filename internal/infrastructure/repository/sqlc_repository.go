@@ -63,6 +63,6 @@ func (r *SQLCRepository) GetJobByID(ctx context.Context, id int64) (domain.Video
 			ID:       row.ID,
 			Filename: row.Filename,
 		},
-		Status: domain.JobStatus(row.Status),
+		Status: domain.JobStatus(fmt.Sprintf("%v", row.Status)),
 	}, nil
 }
