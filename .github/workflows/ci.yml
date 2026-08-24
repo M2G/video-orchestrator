@@ -17,10 +17,13 @@ jobs:
         with:
           go-version: '1.26'
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.64.8
 
   test:
     name: Unit Tests
@@ -31,6 +34,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Run unit tests
         run: go test ./internal/interfaces/...
@@ -61,6 +67,9 @@ jobs:
         with:
           go-version: '1.26'
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Apply schema
         env:
           PGPASSWORD: admin
@@ -81,6 +90,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Build
         run: make build
