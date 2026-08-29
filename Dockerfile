@@ -11,14 +11,14 @@ RUN go mod download
 
 COPY . .
 
+
 FROM base AS dev
 
-RUN go install github.com/M2G/modd/cmd/modd@v0.1.2
-RUN mv "$(go env GOPATH)/bin/modd" /usr/local/bin/modd
+RUN go install github.com/air-verse/air@latest
 
 EXPOSE 8181
-ENTRYPOINT ["modd"]
-CMD ["-f", "configuration/modd/modd.conf"]
+ENTRYPOINT ["air"]
+CMD ["-c", "configuration/air/.air.toml"]
 
 
 FROM base AS builder
