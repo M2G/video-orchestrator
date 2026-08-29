@@ -1,21 +1,35 @@
 services:
   api:
     build:
-      context: .
+      context: . # build from video-orchestrator/Dockerfile
       target: dev
     container_name: video_orchestrator
     volumes:
-      - ./:/go/src/video-orchestrator
-      - /var/www/html/streams:/var/www/html/streams
-      - /var/www/html/uploads:/var/www/html/uploads
+      - uploads:/data/uploads
+      - streams:/data/streams
+    environment:
+      - UPLOAD_DIR=/data/uploads
+      - STREAMS_DIR=/data/streams
     env_file:
       - configuration/env/dev.env
-      - .env
     ports:
       - "8181:8181"
     depends_on:
       postgres:
         condition: service_healthy
+
+  video_segmenter:
+    build:
+      context: ../video_segmenter
+    container_name: video_segmenter
+    environment:
+      - WATCH_DIR=/data/uploads
+      - OUTPUT_DIR=/data/streams
+      - SEGMENT_DURATION=10
+    volumes:
+      - uploads:/data/uploads
+      - streams:/data/streams
+    restart: always
 
   postgres:
     image: postgres:18-alpine
@@ -25,19 +39,11 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    logging:
-      options:
-        max-size: 10m
-        max-file: "10"
     ports:
       - "${POSTGRES_EXTERNAL_PORT}:${POSTGRES_INTERNAL_PORT}"
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    security_opt:
-      - seccomp:unconfined
-    cap_add:
-      - SYS_NICE
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 5s
@@ -46,3 +52,5 @@ services:
 
 volumes:
   postgres-data:
+  uploads:
+  streams:
