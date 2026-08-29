@@ -4,3 +4,4 @@
 .env
 configuration/env/*.env
 bin/
+tmp/
