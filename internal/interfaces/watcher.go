@@ -35,7 +35,8 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 			return
 
 		default:
-			pattern := filepath.Join(w.streamsDir, "*", "index.m3u8")
+			// pattern : {streamsDir}/{id}/{id}.m3u8
+			pattern := filepath.Join(w.streamsDir, "*", "*.m3u8")
 			matches, err := filepath.Glob(pattern)
 			if err != nil {
 				log.WithError(err).Error("glob_failed")
@@ -71,7 +72,7 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 
 					if err := w.repo.MarkDone(ctx, jobID); err != nil {
 						log.WithError(err).WithField("job_id", jobID).Error("mark_done_failed")
-						seen[match] = struct{}{} // retry au prochain tick
+						delete(seen, match) // retry au prochain tick
 						return
 					}
 
