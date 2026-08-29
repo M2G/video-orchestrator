@@ -1,0 +1,12 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ./cmd/video-orchestrator"
+  bin = "./tmp/main"
+  delay = 1000
+  exclude_dir = ["tmp", "vendor", ".git", "db"]
+  include_ext = ["go"]
+
+[log]
+  time = true
