@@ -25,12 +25,7 @@ type HTTPServer struct {
 	server     *http.Server
 }
 
-func NewHTTPServer(
-	repo domain.Repository,
-	uploadDir string,
-	streamsDir string,
-	log *logrus.Logger,
-) *HTTPServer {
+func NewHTTPServer(repo domain.Repository, uploadDir string, streamsDir string, log *logrus.Logger) *HTTPServer {
 	h := &HTTPServer{
 		repo:       repo,
 		uploadDir:  uploadDir,
@@ -38,6 +33,7 @@ func NewHTTPServer(
 		log:        log,
 	}
 
+	http.HandleFunc("GET /test", h.test)
 	http.HandleFunc("POST /jobs", h.handleUpload)
 	http.HandleFunc("GET /jobs/{id}", h.handleGetJob)
 	http.HandleFunc("GET /streams/video/{id}/{filename}", h.handleServeFile)
@@ -45,6 +41,11 @@ func NewHTTPServer(
 	h.server = &http.Server{}
 
 	return h
+}
+
+func (h *HTTPServer) test(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *HTTPServer) Start(addr string) error {
