@@ -157,7 +157,7 @@ func (h *HTTPServer) handleServeFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
-func (h *HTTPServer) sendJSON(w http.ResponseWriter, status int, body any) {
+func (h *HTTPServer) sendJSON(w http.ResponseWriter, status int, body interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(body)
