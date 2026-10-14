@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"video-orchestrator/internal/domain"
@@ -26,6 +27,7 @@ func NewWatcher(streamsDir string, repo domain.Repository) *Watcher {
 func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 	log.Info("watcher_started")
 
+	var mu sync.Mutex
 	seen := make(map[string]struct{})
 
 	for {
@@ -35,7 +37,6 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 			return
 
 		default:
-			// pattern : {streamsDir}/{id}/{id}.m3u8
 			pattern := filepath.Join(w.streamsDir, "*", "*.m3u8")
 			matches, err := filepath.Glob(pattern)
 			if err != nil {
@@ -44,11 +45,15 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 			}
 
 			for _, match := range matches {
-				if _, ok := seen[match]; ok {
+				mu.Lock()
+				_, already := seen[match]
+				if !already {
+					seen[match] = struct{}{}
+				}
+				mu.Unlock()
+				if already {
 					continue
 				}
-
-				seen[match] = struct{}{}
 
 				dir := filepath.Dir(match)
 				videoID := filepath.Base(dir)
@@ -59,7 +64,7 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 					continue
 				}
 
-				go func(jobID int64) {
+				go func(jobID int64, path string) {
 					exists, err := w.repo.Exists(ctx, jobID)
 					if err != nil {
 						log.WithError(err).WithField("job_id", jobID).Error("exists_check_failed")
@@ -72,12 +77,14 @@ func (w *Watcher) Start(ctx context.Context, log *logrus.Logger) {
 
 					if err := w.repo.MarkDone(ctx, jobID); err != nil {
 						log.WithError(err).WithField("job_id", jobID).Error("mark_done_failed")
-						delete(seen, match) // retry au prochain tick
+						mu.Lock()
+						delete(seen, path) // retry au prochain tick
+						mu.Unlock()
 						return
 					}
 
 					log.WithField("job_id", jobID).Info("job_complete")
-				}(id)
+				}(id, match)
 			}
 
 			select {
