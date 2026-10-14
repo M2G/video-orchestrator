@@ -50,8 +50,10 @@ services:
       timeout: 5s
       retries: 5
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     container_name: video_redis
+    ports:
+      - ${HOST_PORT_REDIS}:${CONTAINER_PORT_REDIS}
     restart: always
     command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "32mb" ]
     healthcheck:
