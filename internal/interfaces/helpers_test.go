@@ -5,7 +5,11 @@ import (
 	"context"
 	"io"
 	"mime/multipart"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
+	"video-orchestrator/internal/interfaces"
 
 	"video-orchestrator/internal/domain"
 
@@ -68,4 +72,39 @@ func noopLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetOutput(io.Discard)
 	return log
+}
+
+func TestWatcher_DetectsJobNamedM3U8(t *testing.T) {
+	streamsDir := t.TempDir()
+	videoDir := filepath.Join(streamsDir, "1")
+	if err := os.MkdirAll(videoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	marked := make(chan int64, 1)
+	repo := defaultRepoHTTP()
+	repo.markDoneFn = func(_ context.Context, id int64) error {
+		marked <- id
+		return nil
+	}
+
+	watcher := interfaces.NewWatcher(streamsDir, repo)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go watcher.Start(ctx, noopLogger())
+
+	if err := os.WriteFile(filepath.Join(videoDir, "1.m3u8"), []byte("#EXTM3U"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case id := <-marked:
+		if id != 1 {
+			t.Errorf("expected job id 1, got %d", id)
+		}
+	case <-ctx.Done():
+		t.Fatal("timeout: watcher did not detect 1.m3u8")
+	}
 }

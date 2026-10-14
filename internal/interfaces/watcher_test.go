@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 	"video-orchestrator/internal/domain"
@@ -115,32 +116,39 @@ func TestWatcher_IgnoresAlreadySeen(t *testing.T) {
 	if err := os.MkdirAll(videoDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-
-	m3u8Path := filepath.Join(videoDir, "index.m3u8")
-	if err := os.WriteFile(m3u8Path, []byte("#EXTM3U"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(videoDir, "99.m3u8"), []byte("#EXTM3U"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	count := 0
-	repo := &mockRepoWatcher{
-		existsFn: func(_ context.Context, id int64) (bool, error) { return true, nil },
-		markDoneFn: func(_ context.Context, id int64) error {
-			count++
-			return nil
-		},
+	var count atomic.Int32
+	called := make(chan struct{}, 1)
+
+	repo := defaultRepoHTTP()
+	repo.markDoneFn = func(_ context.Context, _ int64) error {
+		if count.Add(1) == 1 {
+			called <- struct{}{}
+		}
+		return nil
 	}
 
 	watcher := interfaces.NewWatcher(streamsDir, repo)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 
 	go watcher.Start(ctx, noopLogger())
 
-	time.Sleep(3 * time.Second)
+	select {
+	case <-called:
+	case <-ctx.Done():
+		t.Fatal("timeout: watcher did not call MarkDone")
+	}
 
-	if count > 1 {
-		t.Errorf("expected markDone called once, got %d", count)
+	// laisse passer au moins un tick supplémentaire du watcher (2 s)
+	time.Sleep(2500 * time.Millisecond)
+
+	if got := count.Load(); got != 1 {
+		t.Errorf("expected markDone called once, got %d", got)
 	}
 }
 
