@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -184,5 +185,59 @@ func TestHandleServeFile_ForbiddenExtension(t *testing.T) {
 
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleUpload_RenamesFileWithJobID(t *testing.T) {
+	t.Cleanup(func() { testRepo.createJobFn = defaultRepoHTTP().createJobFn })
+
+	var gotFilename string
+	testRepo.createJobFn = func(_ context.Context, filename string) (domain.VideoJob, error) {
+		gotFilename = filename
+		return domain.VideoJob{ID: 7, Filename: filename}, nil
+	}
+
+	body, contentType := multipartBody(t, "holiday.mp4", []byte("fake mp4 content"))
+
+	resp, err := http.Post(testServer.URL+"/jobs", contentType, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	if gotFilename != "holiday.mp4" {
+		t.Errorf("expected CreateJob to receive the original filename, got %q", gotFilename)
+	}
+	if _, err := os.Stat(filepath.Join(testUploadDir, "7.mp4")); err != nil {
+		t.Errorf("expected 7.mp4 in upload dir: %v", err)
+	}
+	if tmp, _ := filepath.Glob(filepath.Join(testUploadDir, ".tmp-*")); len(tmp) != 0 {
+		t.Errorf("temporary files left behind: %v", tmp)
+	}
+}
+
+func TestHandleUpload_CreateJobFails_RemovesTempFile(t *testing.T) {
+	t.Cleanup(func() { testRepo.createJobFn = defaultRepoHTTP().createJobFn })
+
+	testRepo.createJobFn = func(_ context.Context, _ string) (domain.VideoJob, error) {
+		return domain.VideoJob{}, errors.New("db down")
+	}
+
+	body, contentType := multipartBody(t, "broken.mp4", []byte("fake mp4 content"))
+
+	resp, err := http.Post(testServer.URL+"/jobs", contentType, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", resp.StatusCode)
+	}
+	if tmp, _ := filepath.Glob(filepath.Join(testUploadDir, ".tmp-*")); len(tmp) != 0 {
+		t.Errorf("temporary files left behind: %v", tmp)
 	}
 }
