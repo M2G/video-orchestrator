@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"os"
+	"slices"
 	"testing"
 
 	"video-orchestrator/internal/infrastructure/db"
@@ -111,5 +112,46 @@ func TestGetJobByID_NotFound(t *testing.T) {
 	_, err := repo.GetJobByID(ctx, 999999)
 	if err == nil {
 		t.Error("expected error for non-existent job")
+	}
+}
+
+func TestDeleteDoneOlderThan(t *testing.T) {
+	repo := setupDB(t)
+	ctx := context.Background()
+
+	done, err := repo.CreateJob(ctx, "done.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.MarkDone(ctx, done.ID); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := repo.CreateJob(ctx, "pending.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ids, err := repo.DeleteDoneOlderThan(ctx, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(ids, done.ID) {
+		t.Error("a job done just now must not be purged with a 7 day retention")
+	}
+
+	ids, err = repo.DeleteDoneOlderThan(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(ids, done.ID) {
+		t.Error("expected the done job to be purged with a 0 day retention")
+	}
+	if slices.Contains(ids, pending.ID) {
+		t.Error("a pending job must never be purged")
+	}
+
+	exists, err := repo.Exists(ctx, pending.ID)
+	if err != nil || !exists {
+		t.Errorf("pending job must still exist (exists=%v, err=%v)", exists, err)
 	}
 }
