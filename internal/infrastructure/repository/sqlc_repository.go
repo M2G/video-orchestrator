@@ -66,3 +66,11 @@ func (r *SQLCRepository) GetJobByID(ctx context.Context, id int64) (domain.Video
 		Status: domain.JobStatus(fmt.Sprintf("%v", row.Status)),
 	}, nil
 }
+
+func (r *SQLCRepository) DeleteDoneOlderThan(ctx context.Context, days int) ([]int64, error) {
+	ids, err := r.q.DeleteOldDoneJobs(ctx, int32(days))
+	if err != nil {
+		return nil, fmt.Errorf("delete old done jobs: %w", err)
+	}
+	return ids, nil
+}

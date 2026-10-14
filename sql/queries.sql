@@ -72,7 +72,8 @@ SET status    = 'PENDING',
 WHERE status = 'PROCESSING'
   AND locked_at < now() - interval '10 minutes';
 
--- name: DeleteOldDoneJobs :exec
+-- name: DeleteOldDoneJobs :many
 DELETE FROM video_jobs
 WHERE status = 'DONE'
-  AND updated_at < now() - interval '7 days';
+  AND updated_at < now() - (sqlc.arg(retention_days)::int * interval '1 day')
+    RETURNING id;
