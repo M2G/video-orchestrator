@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"video-orchestrator/internal/domain"
 
@@ -79,8 +81,8 @@ func (h *HTTPServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer part.Close()
 
-	filename := part.FileName()
-	if !strings.HasSuffix(filename, ".mp4") {
+	originalFilename := part.FileName()
+	if !strings.HasSuffix(originalFilename, ".mp4") {
 		h.sendError(w, http.StatusBadRequest, "only MP4 files are accepted")
 		return
 	}
@@ -90,23 +92,41 @@ func (h *HTTPServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	destPath := filepath.Join(h.uploadDir, filename)
-	f, err := os.Create(destPath)
+	// écriture dans un fichier temporaire : le préfixe "." et l'extension
+	// .tmp-... empêchent video_segmenter de le prendre pendant l'upload
+	tempPath := filepath.Join(h.uploadDir, fmt.Sprintf(".tmp-%d.part", time.Now().UnixNano()))
+	f, err := os.Create(tempPath)
 	if err != nil {
 		h.sendError(w, http.StatusInternalServerError, "failed to create file")
 		return
 	}
-	defer f.Close()
 
 	const maxSize = 2 << 30 // 2GB
 	if _, err := io.Copy(f, io.LimitReader(part, maxSize)); err != nil {
+		f.Close()
+		os.Remove(tempPath)
+		h.sendError(w, http.StatusInternalServerError, "failed to write file")
+		return
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tempPath)
 		h.sendError(w, http.StatusInternalServerError, "failed to write file")
 		return
 	}
 
-	job, err := h.repo.CreateJob(r.Context(), destPath)
+	// le job donne l'ID dont on a besoin pour nommer le fichier final
+	job, err := h.repo.CreateJob(r.Context(), originalFilename)
 	if err != nil {
+		os.Remove(tempPath)
 		h.sendError(w, http.StatusInternalServerError, "failed to create job")
+		return
+	}
+
+	// video_segmenter produira alors streams/{id}/{id}.m3u8
+	finalPath := filepath.Join(h.uploadDir, fmt.Sprintf("%d.mp4", job.ID))
+	if err := os.Rename(tempPath, finalPath); err != nil {
+		os.Remove(tempPath)
+		h.sendError(w, http.StatusInternalServerError, "failed to finalize upload")
 		return
 	}
 
